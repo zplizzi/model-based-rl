@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # needs to be unique to the job
+  name: single02
+spec:
+  template:
+    metadata:
+      # This lets us get logs for all pods by using a label selector
+      labels:
+        key1: val1
+    spec:
+      containers:
+      - name: train
+        image: 551998434661.dkr.ecr.us-west-2.amazonaws.com/test:latest
+        command: [ "/bin/bash", "-c", "--" ]
+        args:
+          - "python3 -m papers.muzero.trainable --num_vec_env=32 --batch_size=512 --num_unroll_steps=5 --lr_init=0.0001 --discount=.95 --num_workers=4 --td_steps=64 --buffer_size=1000"
+        ports:
+          - containerPort: 12345 # Ray internal communication.
+          - containerPort: 12346 # Ray internal communication.
+        resources:
+          requests:
+            cpu: "4"
+          limits:
+            nvidia.com/gpu: 1
+        volumeMounts:
+          - name: code
+            mountPath: "/mnt"
+          - name: dshm
+            mountPath: /dev/shm
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "0"
+        - name: WANDB_API_KEY
+          value: "b613efbba7b7a23780809df4232d22dc2ef55c57"
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+      - name: code
+        nfs:
+          server: fs-d353b279.efs.us-west-2.amazonaws.com
+          path: /
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 30
+  backoffLimit: 0
